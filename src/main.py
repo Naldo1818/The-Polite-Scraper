@@ -1,7 +1,10 @@
 import time
+import json
+import os
 import requests
 
-from scraper import extract_book
+from scraper import extract_book, normalize_price
+from models import Book
 
 
 BASE_URL = "https://books.toscrape.com/"
@@ -12,10 +15,6 @@ HEADERS = {
 
 
 def get_page(url):
-    """
-    Download a webpage and return its HTML.
-    """
-
     response = requests.get(
         url,
         headers=HEADERS,
@@ -28,11 +27,6 @@ def get_page(url):
 
 
 def find_books(html, page_url):
-    """
-    Find all book links on a catalogue page.
-    Convert relative URLs into absolute URLs.
-    """
-
     from bs4 import BeautifulSoup
     from urllib.parse import urljoin
 
@@ -41,7 +35,6 @@ def find_books(html, page_url):
     book_links = []
 
     for book in soup.select("article.product_pod h3 a"):
-
         href = book.get("href")
 
         if href:
@@ -52,10 +45,6 @@ def find_books(html, page_url):
 
 
 def find_next_page(html, page_url):
-    """
-    Find the catalogue's next page link.
-    """
-
     from bs4 import BeautifulSoup
     from urllib.parse import urljoin
 
@@ -73,27 +62,19 @@ def find_next_page(html, page_url):
 
 
 def main():
-
-    
     current_url = BASE_URL
-
     catalogue_pages = 0
     all_book_urls = []
 
     while catalogue_pages < 3 and current_url:
-
         print()
         print(f"Fetching catalogue page: {current_url}")
 
         try:
-
             html = get_page(current_url)
-
         except requests.RequestException as error:
-
             print(f"Failed to fetch catalogue page: {current_url}")
             print(f"Reason: {error}")
-
             break
 
         catalogue_pages += 1
@@ -109,7 +90,6 @@ def main():
 
         time.sleep(0.5)
 
-        
         current_url = find_next_page(
             html,
             current_url
@@ -127,8 +107,8 @@ def main():
     print(f"discovered={len(all_book_urls)}")
     print(f"unique_urls={len(unique_urls)}")
 
-
     all_books = []
+    errors = []
 
     print()
     print("--------------------------------")
@@ -139,13 +119,11 @@ def main():
         unique_urls,
         start=1
     ):
-
         print(
-            f"Extracting book {index}/{len(unique_urls)}"
+            f"Processing book {index}/{len(unique_urls)}"
         )
 
         try:
-
             time.sleep(0.5)
 
             book_html = get_page(book_url)
@@ -156,49 +134,68 @@ def main():
                 BASE_URL
             )
 
-            all_books.append(book)
+            book["price_gbp"] = normalize_price(
+                book["price_text"]
+            )
+
+            validated_book = Book(**book)
+
+            all_books.append(
+                validated_book.model_dump(mode="json")
+            )
 
         except requests.RequestException as error:
+            print(f"Failed to fetch: {book_url}")
+            print(f"Reason: {error}")
 
-            print(
-                f"Failed to fetch: {book_url}"
-            )
-
-            print(
-                f"Reason: {error}"
-            )
+            errors.append({
+                "product_url": book_url,
+                "reason": str(error)
+            })
 
         except Exception as error:
+            print(f"Failed to process: {book_url}")
+            print(f"Reason: {error}")
 
-            print(
-                f"Failed to extract: {book_url}"
-            )
+            errors.append({
+                "product_url": book_url,
+                "reason": str(error)
+            })
 
-            print(
-                f"Reason: {error}"
-            )
+    os.makedirs("output", exist_ok=True)
 
+    with open(
+        "output/books.json",
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            all_books,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
+
+    with open(
+        "output/errors.json",
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            errors,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
 
     print()
     print("--------------------------------")
-    print("STAGE 3 CHECKPOINT")
+    print("STAGE 4 CHECKPOINT")
     print("--------------------------------")
-
-    print(
-        f"detail_pages={len(all_books)}"
-    )
-
-    if all_books:
-
-        print()
-        print("Example raw record:")
-        print()
-
-        print(all_books[0])
-
-    else:
-
-        print("No books were extracted.")
+    print(f"valid_records={len(all_books)}")
+    print(f"invalid_records={len(errors)}")
+    print("books.json saved to output/books.json")
+    print("errors.json saved to output/errors.json")
 
 
 if __name__ == "__main__":

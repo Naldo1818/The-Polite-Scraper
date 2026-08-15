@@ -1,6 +1,18 @@
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
+def normalize_price(price_text):
+    if not price_text:
+        raise ValueError("Price is missing")
+
+    cleaned = (
+        price_text
+        .replace("£", "")
+        .replace("Â", "")
+        .strip()
+    )
+
+    return float(cleaned)
 
 def extract_book(html, product_url, source_page):
     soup = BeautifulSoup(html, "html.parser")
