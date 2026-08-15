@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-
+import time
 
 BASE_URL = "https://books.toscrape.com/"
 HEADERS = {
@@ -65,6 +65,8 @@ def main():
         all_book_urls.extend(books)
 
         print(f"Books found on this page: {len(books)}")
+
+        time.sleep(0.5)
 
         current_url = find_next_page(html, current_url)
 
