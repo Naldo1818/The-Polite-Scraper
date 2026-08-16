@@ -20,7 +20,7 @@ def get_page(url):
     response = requests.get(
         url,
         headers=HEADERS,
-        timeout=10
+        timeout=20
     )
 
     response.raise_for_status()
@@ -324,7 +324,7 @@ def main():
 
     print()
     print("--------------------------------")
-    print("STAGE 5 CHECKPOINT")
+    print("STAGE 6 CHECKPOINT")
     print("--------------------------------")
 
     print(
